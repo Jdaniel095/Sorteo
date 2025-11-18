@@ -15,7 +15,7 @@
   body{
     background:var(--bg);
     color:#fff;
-    font-family:Arial;
+    font-family:Arial, system-ui, sans-serif;
     padding:20px;
     text-align:center;
   }
@@ -75,30 +75,22 @@
     overflow:hidden;
   }
 
-  /* Flecha correcta */
-/* Flecha arriba pero apuntando hacia abajo */
-    #spinWheel::after {
-      content: "";
-      position: absolute;
-      top: 0px;
-      left: calc(50% - 10px);
-      width: 0;
-      height: 0;
-      border-left: 10px solid transparent;
-      border-right: 10px solid transparent;
-      border-top: 20px solid #feeb69;
-      -webkit-filter: drop-shadow(1px 2px 2px rgba(0, 0, 0, .5));
-      filter: drop-shadow(1px 2px 2px rgba(0, 0, 0, .5));
-    }
-
-
+  #spinWheel::after {
+    content:"";
+    position:absolute;
+    top:0px;
+    left:calc(50% - 10px);
+    width:0;height:0;
+    border-left:10px solid transparent;
+    border-right:10px solid transparent;
+    border-top:20px solid #feeb69;
+    filter:drop-shadow(1px 2px 2px rgba(0,0,0,.5));
+  }
 
   #spin{
     position:absolute;
-    top:50%;
-    left:50%;
-    width:70px;
-    height:70px;
+    top:50%;left:50%;
+    width:70px;height:70px;
     background:#333;
     color:white;
     border-radius:50%;
@@ -130,12 +122,10 @@
     font-size:1.1rem;
   }
 
-  /* Colores detectados */
-.user-owner { color: rgb(231,67,122); font-weight:bold; }
-.user-admin { color: rgb(244,166,42); font-weight:bold; }
-.user-gray  { color: rgb(200,200,200); }
-.user-unknown { color: #fff; }
-
+  .user-owner{color:rgb(231,67,122);font-weight:bold;}
+  .user-admin{color:rgb(244,166,42);font-weight:bold;}
+  .user-gray {color:rgb(200,200,200);}
+  .user-unknown{color:#fff;}
 </style>
 </head>
 
@@ -175,102 +165,87 @@
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/tesseract.js@4.0.2/dist/tesseract.min.js"></script>
-
 <script>
-/* =========================================================================
-       SPINWHEEL — VERSIÓN ORIGINAL DEL TUTORIAL (FUNCIONA PERFECTO)
-============================================================================ */
+/* ============================================================
+   CONFIG — TU WEBAPP DE APPS SCRIPT
+============================================================ */
+const WEBAPP_URL = "https://script.google.com/macros/s/AKfycbznQ11EdxWxHt3_2yKRBHhl_Y82nTWRUQzp4d78q77sHAYBD8huTBTDftUrIf1TbWbY_Q/exec"; // <-- REEMPLAZA ESTO
 
-class EventEmitter {
-  constructor(){ this.listeners={}; }
-  on(e,cb){ (this.listeners[e] ??= []).push(cb); }
-  emit(e,...a){ (this.listeners[e]||[]).forEach(cb=>cb(...a)); }
-}
+/* ============================================================
+   RULETA (SPINWHEEL ORIGINAL)
+============================================================ */
+class EventEmitter{constructor(){this.l={}}on(e,f){(this.l[e]??=[]).push(f)}emit(e,...a){(this.l[e]||[]).forEach(fn=>fn(...a))}}
+class SpinWheel{
+  constructor({canvasSelector,buttonSelector,sectors,friction=0.991}) {
+    this.sectors=sectors;
+    this.canvas=document.querySelector(canvasSelector);
+    this.ctx=this.canvas.getContext("2d");
+    this.button=document.querySelector(buttonSelector);
+    this.friction=friction;
 
-class SpinWheel {
-  constructor({ canvasSelector, buttonSelector, sectors, friction = 0.991 }) {
+    this.diameter=this.canvas.width;
+    this.radius=this.diameter/2;
 
-    this.sectors = sectors;
-    this.friction = friction;
+    this.total=sectors.length;
+    this.arc=(2*Math.PI)/this.total;
 
-    this.canvas = document.querySelector(canvasSelector);
-    this.ctx = this.canvas.getContext("2d");
+    this.angle=0;
+    this.angularVelocity=0;
+    this.spinButtonClicked=false;
 
-    this.button = document.querySelector(buttonSelector);
-
-    this.diameter = this.canvas.width;
-    this.radius   = this.diameter / 2;
-
-    this.total = sectors.length;
-    this.arc = (2 * Math.PI) / this.total;
-
-    this.angle = 0;
-    this.angularVelocity = 0;
-    this.spinButtonClicked = false;
-
-    this.events = new EventEmitter();
-
+    this.events=new EventEmitter();
     this.init();
   }
 
-  /** Cálculo correcto basado en rotación real */
   get currentIndex(){
-    return Math.floor(
-      this.total - (this.angle / (2 * Math.PI)) * this.total
-    ) % this.total;
+    return Math.floor(this.total - (this.angle/(2*Math.PI))*this.total)%this.total;
   }
 
-  drawSector(sector,i){
-    const start = this.arc * i;
-
+  drawSector(s,i){
+    const start=this.arc*i;
     this.ctx.save();
-
     this.ctx.beginPath();
-    this.ctx.fillStyle = sector.color;
-    this.ctx.moveTo(this.radius, this.radius);
+    this.ctx.fillStyle=s.color;
+    this.ctx.moveTo(this.radius,this.radius);
     this.ctx.arc(this.radius,this.radius,this.radius,start,start+this.arc);
     this.ctx.closePath();
     this.ctx.fill();
 
-    // Texto rotado correctamente
     this.ctx.translate(this.radius,this.radius);
-    this.ctx.rotate(start + this.arc/2);
+    this.ctx.rotate(start+this.arc/2);
     this.ctx.textAlign="right";
-    this.ctx.fillStyle = sector.textColor;
+    this.ctx.fillStyle=s.textColor;
     this.ctx.font="bold 20px Arial";
-    this.ctx.fillText(sector.label, this.radius - 10, 5);
-
+    this.ctx.fillText(s.label,this.radius-10,5);
     this.ctx.restore();
   }
 
   rotateCanvas(){
-    this.canvas.style.transform = `rotate(${this.angle - Math.PI/2}rad)`;
+    this.canvas.style.transform=`rotate(${this.angle-Math.PI/2}rad)`;
   }
 
   updateFrame(){
     if(!this.angularVelocity && this.spinButtonClicked){
-      const win = this.sectors[this.currentIndex];
-      this.events.emit("finishSpinning", win);
+      const win=this.sectors[this.currentIndex];
+      this.events.emit("finishSpinning",win);
       this.spinButtonClicked=false;
       return;
     }
+    this.angularVelocity*=this.friction;
+    if(this.angularVelocity<0.002) this.angularVelocity=0;
 
-    this.angularVelocity *= this.friction;
-    if(this.angularVelocity < 0.002) this.angularVelocity = 0;
-
-    this.angle += this.angularVelocity;
-    this.angle %= (2*Math.PI);
+    this.angle+=this.angularVelocity;
+    this.angle%=(2*Math.PI);
 
     this.rotateCanvas();
   }
 
   start(){
-    const fn = () =>{
+    const animate=()=>{
       this.updateFrame();
-      requestAnimationFrame(fn);
+      requestAnimationFrame(animate);
     };
-    fn();
+    animate();
   }
 
   init(){
@@ -279,245 +254,115 @@ class SpinWheel {
     this.start();
 
     this.button.addEventListener("click",()=>{
-      if(!this.angularVelocity)
-        this.angularVelocity = Math.random()*0.2 + 0.25;
-
-      this.spinButtonClicked = true;
+      if(!this.angularVelocity){
+        this.angularVelocity=Math.random()*0.2+0.25;
+      }
+      this.spinButtonClicked=true;
     });
   }
 }
 
-/* =========================================================================
-        OCR + FILTRO COLOR + LISTA PARTICIPANTES
-============================================================================ */
+/* ============================================================
+   OCR + FILTRO PARTICIPANTES
+============================================================ */
 
-const fileInput = document.getElementById("fileInput");
-let seenFiles = new Set();
-let userColors = new Map();
+const fileInput=document.getElementById("fileInput");
+let seenFiles=new Set();
+let userColors=new Map();
+let listaATodo=[];
 let participants=[];
-let listaATodo = [];
 
-const ownerRGB=[231,67,122];
-const adminRGB=[244,166,42];
+// NO FILTRAMOS COLORES AÚN — SOLO ADMIN FIJOS
+const listaProhibidos=[
+  "@PokeComasGO","@BryanStar17","@Alvaro2399","@iDaniel095",
+  "@JSAP26","@AdminExtra3","@AdminExtra4","@AdminExtra5"
+];
 
-function dist(a,b){
-  return Math.sqrt((a[0]-b[0])**2+(a[1]-b[1])**2+(a[2]-b[2])**2);
-}
-
-function classifyColor([r,g,b]){
-  // ROSADO ORGANIZADOR (#e7437a) ± tolerancia
-  if (dist([r,g,b],[231,67,122]) < 60) return "owner";
-
-  // NARANJA ADMIN (#f4a62a) ± tolerancia
-  if (dist([r,g,b],[244,166,42]) < 60) return "admin";
-
-  // GRIS (letras normales)
-  if (Math.abs(r-g)<20 && Math.abs(r-b)<20) return "gray";
-
-  return "unknown";
-}
-
-
-fileInput.addEventListener("change", async ()=>{
+fileInput.addEventListener("change",async()=>{
   const files=[...fileInput.files];
-
   const nuevos=[];
+
   for(const f of files){
     const key=`${f.name}|${f.size}|${f.lastModified}`;
-    if(!seenFiles.has(key)){
-      seenFiles.add(key);
-      nuevos.push(f);
-    }
+    if(!seenFiles.has(key)){ seenFiles.add(key); nuevos.push(f); }
   }
 
-  document.getElementById("captureInfo").textContent =
+  document.getElementById("captureInfo").textContent=
     `Capturas subidas: ${seenFiles.size}`;
 
-  for(const f of nuevos) await processImage(f);
-
-  // === RESUMEN GLOBAL ===
-console.log("======================================");
-console.log("📢 RESUMEN GLOBAL DE TODOS LOS @ DETECTADOS");
-console.log("======================================");
-
-const unicos = [...new Set(listaATodo)];
-
-console.log("📋 Lista única:");
-console.log(unicos);
-
-console.log("🔢 Total únicos detectados:", unicos.length);
-console.log("======================================");
-
+  for(const f of nuevos){
+    await enviarImagenAGAS(f);
+  }
 
   buildParticipants();
   updateUI();
 });
 
-// 🚫 Lista fija de organizador + admins (estos NO participan)
-const listaProhibidos = [
-  "@PokeComasGO",
-  "@BryanStar17",
-  "@Alvaro2399",
-  "@iDaniel095",
-  "@JSAP26",
-  "@AdminExtra3",
-  "@AdminExtra4",
-  "@AdminExtra5"
-];
-
-
-async function processImage(file){
+/* === ENVÍO A APPS SCRIPT + VISION OCR === */
+async function enviarImagenAGAS(file){
   return new Promise((resolve)=>{
-    const img=new Image();
-    img.onload=async ()=>{
+    const reader=new FileReader();
+    reader.onload=async()=>{
+      const base64=reader.result.split(",")[1];
 
-      const canvas=document.createElement("canvas");
-      const ctx=canvas.getContext("2d",{willReadFrequently:true});
-      canvas.width=img.width;
-      canvas.height=img.height;
-      ctx.drawImage(img,0,0);
+      const res=await fetch(WEBAPP_URL,{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({ image:base64 })
+      });
 
-      const result=await Tesseract.recognize(img,"eng");
-      const lines=result.data.text.split("\n").map(l=>l.trim());
+      const json=await res.json();
+      if(!json.ok){ console.error("ERROR OCR:",json.error); resolve(); return; }
 
-      const atLines = lines.filter(l => l.trim().startsWith("@"));
-
-// === LOG SUPER DETALLADO DEL OCR ===
-console.log("--------------------------------------------------");
-console.log("📸 Nueva imagen procesada:", file.name);
-console.log("📝 Texto detectado por OCR (raw):");
-console.log(result.data.text);
-console.log("--------------------------------------------------");
-
-console.log("🔍 Lista de líneas que empiezan con @:");
-console.log(atLines);
-
-console.log(`📌 Total @ detectados en esta imagen: ${atLines.length}`);
-console.log("--------------------------------------------------");
-
-
-      for(let name of atLines){
-
-    // 👉 Guardar TODOS los @ detectados aunque se filtren después
-    listaATodo.push(name.trim());
-        name=name.replace(/[^\w@]+$/g,"");
-        if(!name) continue;
-
-          // 🚫 Saltar organizador / admins
-  if (listaProhibidos.includes(name)) {
-      console.log("⚠️ Saltado (admin/organizador):", name);
-      continue;
-  }
-
-
-     if (!userColors.has(name)) {
-
-    // Ubicar el texto en la imagen OCR
-    const pos = encontrarPosicionTexto(name, result.data);
-
-    let tipo = "gray"; // todos normales son grises
-
-
-    if (pos) {
-        const prom = muestrearColor(ctx, pos.x, pos.y - 50, canvas.width, canvas.height);
-
-        tipo = classifyColor(prom); // aquí sí usamos tu detectColor real
-    }
-
-    userColors.set(name, tipo);
-}
-
-      }
-
+      procesarTextoOCR(json.text);
       resolve();
     };
-    img.src=URL.createObjectURL(file);
+    reader.readAsDataURL(file);
   });
 }
 
-function encontrarPosicionTexto(texto, data) {
-  const clean = texto.replace("@","").toLowerCase();
+/* === PROCESAR TEXTO OCR (VISIÓN) === */
+function procesarTextoOCR(text){
+  listaATodo.push(text);
 
-  // Usamos "words" que sí existen en Tesseract 4
-  for (const w of data.words) {
-    const t = w.text.replace("@","").toLowerCase();
-    if (t.includes(clean)) {
-      return {
-        x: (w.bbox.x0 + w.bbox.x1) / 2,
-        y: (w.bbox.y0 + w.bbox.y1) / 2
-      };
-    }
+  const encontrados=text.match(/@[A-Za-z0-9_]+/g)||[];
+
+  for(let h of encontrados){
+    if(listaProhibidos.includes(h)) continue;
+    h=h.replace(/[^@A-Za-z0-9_]/g,"");
+    if(!userColors.has(h)) userColors.set(h,"gray");
   }
-  return null;
 }
 
-
-function muestrearColor(ctx, x, y, w, h) {
-  let r=0,g=0,b=0,c=0;
-  for (let dy = -2; dy <= 2; dy++)
-    for (let dx = -2; dx <= 2; dx++) {
-      const px = Math.min(Math.max(Math.round(x+dx),0),w-1);
-      const py = Math.min(Math.max(Math.round(y+dy),0),h-1);
-      const d = ctx.getImageData(px,py,1,1).data;
-      r+=d[0]; g+=d[1]; b+=d[2]; c++;
-    }
-  return [r/c, g/c, b/c];
-}
-
-
+/* ============================================================
+   LISTA + RULETA
+============================================================ */
 
 function buildParticipants(){
-  participants=[];
-
-  for(const [name,color] of userColors){
-
-    if(color==="owner") continue;
-    if(color==="admin") continue;
-
-    const limpio=name.replace("@","");
-    participants.push(limpio);
-  }
+  participants=[...userColors.keys()].map(n=>n.replace("@",""));
 }
 
 function updateUI(){
   document.getElementById("totalDetectados").textContent=userColors.size;
   document.getElementById("totalGrises").textContent=participants.length;
-
   updateList();
   buildWheel();
-
-  document.getElementById("btnBest1").disabled = participants.length===0;
-  document.getElementById("btnBest3").disabled = participants.length<3;
+  document.getElementById("btnBest1").disabled=participants.length===0;
+  document.getElementById("btnBest3").disabled=participants.length<3;
 }
 
-function updateList() {
-  const ul = document.getElementById("listaUsuarios");
-  ul.innerHTML = "";
-
-  for (const [name, colorValue] of userColors.entries()) {
-
-    const li = document.createElement("li");
-
-    const clean = name.replace("@","");
-
-    // Determinar clase visual
-    let cls = "user-unknown";
-
-    if (colorValue === "owner") cls = "user-owner";
-    else if (colorValue === "admin") cls = "user-admin";
-    else if (colorValue === "gray") cls = "user-gray";
-
-    li.className = cls;
-    li.textContent = clean;
-
+function updateList(){
+  const ul=document.getElementById("listaUsuarios");
+  ul.innerHTML="";
+  for(const [name] of userColors.entries()){
+    const li=document.createElement("li");
+    li.className="user-gray";
+    li.textContent=name.replace("@","");
     ul.appendChild(li);
   }
 }
 
-
-/* =========================================================================
-       RULETA — USANDO SPINWHEEL ORIGINAL
-============================================================================ */
+/* === RULETA === */
 
 let spinWheel=null;
 let bestMode="idle";
@@ -528,10 +373,7 @@ function buildWheel(){
   const ctx=canvas.getContext("2d");
   ctx.clearRect(0,0,canvas.width,canvas.height);
 
-  if(!participants.length){
-    spinWheel=null;
-    return;
-  }
+  if(!participants.length){ spinWheel=null; return; }
 
   const sectors=participants.map(n=>({
     label:n,
@@ -539,23 +381,17 @@ function buildWheel(){
     textColor:"#fff"
   }));
 
-  spinWheel = new SpinWheel({
+  spinWheel=new SpinWheel({
     canvasSelector:"#wheel",
     buttonSelector:"#spin",
     sectors
   });
 
-  spinWheel.events.on("finishSpinning",(sector)=>{
-    handleWinner(sector.label);
-  });
+  spinWheel.events.on("finishSpinning",(s)=>handleWinner(s.label));
 }
 
 function handleWinner(name){
-
-  if(bestMode==="idle"){
-    showWinner(name);
-    return;
-  }
+  if(bestMode==="idle") return showWinner(name);
 
   if(bestMode==="best1"){
     showWinner(name);
@@ -566,11 +402,11 @@ function handleWinner(name){
   if(bestMode==="best3"){
     best3++;
     if(best3<=2){
-      participants = participants.filter(n=>n!==name);
+      participants=participants.filter(n=>n!==name);
       alert(`Eliminado: ${name}`);
       updateUI();
       setTimeout(()=>spinWheel.button.click(),400);
-    } else {
+    } else{
       showWinner(name);
       bestMode="idle";
     }
@@ -583,28 +419,20 @@ function showWinner(name){
   box.style.display="block";
 }
 
-/* =========================================================================
-       BOTONES
-============================================================================ */
+/* === BOTONES === */
 
 document.getElementById("btnBest1").onclick=()=>{
-  bestMode="best1";
-  best3=0;
+  bestMode="best1"; best3=0;
   document.getElementById("winnerBox").style.display="none";
   spinWheel.button.click();
 };
 
 document.getElementById("btnBest3").onclick=()=>{
-  if(participants.length<3){
-    alert("Mínimo 3 participantes.");
-    return;
-  }
-  bestMode="best3";
-  best3=0;
+  if(participants.length<3) return alert("Mínimo 3 participantes.");
+  bestMode="best3"; best3=0;
   document.getElementById("winnerBox").style.display="none";
   spinWheel.button.click();
 };
-
 </script>
 
 </body>
