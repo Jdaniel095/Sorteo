@@ -295,6 +295,7 @@ const fileInput = document.getElementById("fileInput");
 let seenFiles = new Set();
 let userColors = new Map();
 let participants=[];
+let listaATodo = [];
 
 const ownerRGB=[231,67,122];
 const adminRGB=[244,166,42];
@@ -334,6 +335,20 @@ fileInput.addEventListener("change", async ()=>{
 
   for(const f of nuevos) await processImage(f);
 
+  // === RESUMEN GLOBAL ===
+console.log("======================================");
+console.log("📢 RESUMEN GLOBAL DE TODOS LOS @ DETECTADOS");
+console.log("======================================");
+
+const unicos = [...new Set(listaATodo)];
+
+console.log("📋 Lista única:");
+console.log(unicos);
+
+console.log("🔢 Total únicos detectados:", unicos.length);
+console.log("======================================");
+
+
   buildParticipants();
   updateUI();
 });
@@ -365,9 +380,26 @@ async function processImage(file){
       const result=await Tesseract.recognize(img,"eng");
       const lines=result.data.text.split("\n").map(l=>l.trim());
 
-      const atLines=lines.filter(l=>l.startsWith("@"));
+      const atLines = lines.filter(l => l.trim().startsWith("@"));
+
+// === LOG SUPER DETALLADO DEL OCR ===
+console.log("--------------------------------------------------");
+console.log("📸 Nueva imagen procesada:", file.name);
+console.log("📝 Texto detectado por OCR (raw):");
+console.log(result.data.text);
+console.log("--------------------------------------------------");
+
+console.log("🔍 Lista de líneas que empiezan con @:");
+console.log(atLines);
+
+console.log(`📌 Total @ detectados en esta imagen: ${atLines.length}`);
+console.log("--------------------------------------------------");
+
 
       for(let name of atLines){
+
+    // 👉 Guardar TODOS los @ detectados aunque se filtren después
+    listaATodo.push(name.trim());
         name=name.replace(/[^\w@]+$/g,"");
         if(!name) continue;
 
