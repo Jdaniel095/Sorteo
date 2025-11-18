@@ -126,6 +126,7 @@
   .user-admin{color:rgb(244,166,42);font-weight:bold;}
   .user-gray {color:rgb(200,200,200);}
   .user-unknown{color:#fff;}
+
 </style>
 </head>
 
@@ -169,7 +170,7 @@
 /* ============================================================
    CONFIG — TU WEBAPP DE APPS SCRIPT
 ============================================================ */
-const WEBAPP_URL = "https://script.google.com/macros/s/AKfycbzI1iCJJqc781hlMgK5_ogHlYqnuxiULJTkwXx3WX6ojynkSwDmQ2IMJTBLs6bjKilU/exec"; // <-- REEMPLAZA ESTO
+const WEBAPP_URL = "https://script.google.com/macros/s/AKfycbTU_URL_AQUI/exec";  /* <-- CAMBIAR SOLO ESTO */
 
 /* ============================================================
    RULETA (SPINWHEEL ORIGINAL)
@@ -263,7 +264,7 @@ class SpinWheel{
 }
 
 /* ============================================================
-   OCR + FILTRO PARTICIPANTES
+   OCR + PARTICIPANTES
 ============================================================ */
 
 const fileInput=document.getElementById("fileInput");
@@ -272,7 +273,6 @@ let userColors=new Map();
 let listaATodo=[];
 let participants=[];
 
-// NO FILTRAMOS COLORES AÚN — SOLO ADMIN FIJOS
 const listaProhibidos=[
   "@PokeComasGO","@BryanStar17","@Alvaro2399","@iDaniel095",
   "@JSAP26","@AdminExtra3","@AdminExtra4","@AdminExtra5"
@@ -281,10 +281,9 @@ const listaProhibidos=[
 fileInput.addEventListener("change",async()=>{
   const files=[...fileInput.files];
   const nuevos=[];
-
   for(const f of files){
     const key=`${f.name}|${f.size}|${f.lastModified}`;
-    if(!seenFiles.has(key)){ seenFiles.add(key); nuevos.push(f); }
+    if(!seenFiles.has(key)){seenFiles.add(key); nuevos.push(f);}
   }
 
   document.getElementById("captureInfo").textContent=
@@ -298,33 +297,37 @@ fileInput.addEventListener("change",async()=>{
   updateUI();
 });
 
-/* === ENVÍO A APPS SCRIPT + VISION OCR === */
+/* === ENVÍO A GOOGLE APPS SCRIPT === */
 async function enviarImagenAGAS(file){
   return new Promise((resolve)=>{
     const reader=new FileReader();
     reader.onload=async()=>{
       const base64=reader.result.split(",")[1];
 
-      const res=await fetch(WEBAPP_URL,{
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({ image:base64 })
-      });
+      try{
+        const res=await fetch(WEBAPP_URL,{
+          method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({ image:base64 })
+        });
 
-      const json=await res.json();
-      if(!json.ok){ console.error("ERROR OCR:",json.error); resolve(); return; }
-
-      procesarTextoOCR(json.text);
+        const json=await res.json();
+        if(json.ok){
+          procesarTextoOCR(json.text);
+        } else{
+          console.error("OCR ERROR:",json.error);
+        }
+      } catch(err){
+        console.error("FETCH ERROR",err);
+      }
       resolve();
     };
     reader.readAsDataURL(file);
   });
 }
 
-/* === PROCESAR TEXTO OCR (VISIÓN) === */
+/* === PROCESAR TEXTO OCR === */
 function procesarTextoOCR(text){
-  listaATodo.push(text);
-
   const encontrados=text.match(/@[A-Za-z0-9_]+/g)||[];
 
   for(let h of encontrados){
@@ -387,11 +390,14 @@ function buildWheel(){
     sectors
   });
 
-  spinWheel.events.on("finishSpinning",(s)=>handleWinner(s.label));
+  spinWheel.events.on("finishSpinning",s=>handleWinner(s.label));
 }
 
 function handleWinner(name){
-  if(bestMode==="idle") return showWinner(name);
+  if(bestMode==="idle"){
+    showWinner(name);
+    return;
+  }
 
   if(bestMode==="best1"){
     showWinner(name);
@@ -406,7 +412,8 @@ function handleWinner(name){
       alert(`Eliminado: ${name}`);
       updateUI();
       setTimeout(()=>spinWheel.button.click(),400);
-    } else{
+    }
+    else{
       showWinner(name);
       bestMode="idle";
     }
@@ -437,4 +444,3 @@ document.getElementById("btnBest3").onclick=()=>{
 
 </body>
 </html>
-
