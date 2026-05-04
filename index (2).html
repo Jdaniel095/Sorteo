@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Monedero">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0f0f0f" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<title>Monedero Rápido</title>
+<style>
+:root {
+  --bg: #ffffff;
+  --bg2: #f5f5f3;
+  --bg3: #ececea;
+  --fg: #0f0f0f;
+  --fg2: #555;
+  --fg3: #999;
+  --border: rgba(0,0,0,0.08);
+  --border2: rgba(0,0,0,0.14);
+  --accent: #0f0f0f;
+  --accent-fg: #ffffff;
+  --danger: #d93025;
+  --success: #1a7f4b;
+  --tab-h: 68px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --radius: 14px;
+  --radius-sm: 9px;
+  --shadow: 0 2px 16px rgba(0,0,0,0.08);
+  --font: -apple-system, 'SF Pro Text', 'Helvetica Neue', sans-serif;
+  --font-display: -apple-system, 'SF Pro Display', 'Helvetica Neue', sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f0f0f;
+    --bg2: #1c1c1e;
+    --bg3: #2c2c2e;
+    --fg: #f5f5f3;
+    --fg2: #aeaeb2;
+    --fg3: #636366;
+    --border: rgba(255,255,255,0.08);
+    --border2: rgba(255,255,255,0.14);
+    --accent: #f5f5f3;
+    --accent-fg: #0f0f0f;
+    --shadow: 0 2px 16px rgba(0,0,0,0.4);
+  }
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; overflow: hidden; font-family: var(--font); background: var(--bg); color: var(--fg); }
+body { display: flex; flex-direction: column; }
+
+/* LAYOUT */
+#app { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
+.page { display: none; flex-direction: column; flex: 1; overflow: hidden; }
+.page.active { display: flex; }
+.scroll-area { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: 16px; }
+.scroll-area::-webkit-scrollbar { display: none; }
+
+/* TOPBAR */
+.topbar {
+  padding: calc(var(--safe-top) + 14px) 20px 12px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: flex-end; justify-content: space-between;
+  flex-shrink: 0;
+}
+.topbar-title { font-family: var(--font-display); font-size: 22px; font-weight: 700; letter-spacing: -0.5px; color: var(--fg); }
+.topbar-sub { font-size: 13px; color: var(--fg3); margin-top: 1px; }
+.topbar-action { width: 36px; height: 36px; border-radius: 50%; background: var(--accent); color: var(--accent-fg); border: none; font-size: 22px; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; transition: transform .15s; }
+.topbar-action:active { transform: scale(0.92); }
+
+/* BOTTOM NAV */
+.bottom-nav {
+  display: flex; justify-content: space-around; align-items: center;
+  height: calc(var(--tab-h) + var(--safe-bottom));
+  padding-bottom: var(--safe-bottom);
+  background: rgba(255,255,255,0.88);
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+  border-top: 1px solid var(--border);
+  flex-shrink: 0; z-index: 100;
+}
+@media (prefers-color-scheme: dark) {
+  .bottom-nav { background: rgba(15,15,15,0.88); }
+}
+.nav-btn { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 20px; cursor: pointer; border: none; background: none; color: var(--fg3); transition: color .2s; flex: 1; }
+.nav-btn.active { color: var(--fg); }
+.nav-btn svg { width: 24px; height: 24px; stroke-width: 1.8; }
+.nav-label { font-size: 10px; font-weight: 500; letter-spacing: -0.2px; }
+
+/* CARDS & SECTIONS */
+.section { padding: 20px 20px 0; }
+.section-label { font-size: 11px; font-weight: 600; color: var(--fg3); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 10px; }
+.card { background: var(--bg2); border-radius: var(--radius); padding: 16px; margin-bottom: 12px; }
+.card-white { background: var(--bg); border: 1px solid var(--border2); border-radius: var(--radius); padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow); }
+
+/* PERSON SELECTOR */
+.person-select-btn {
+  display: flex; align-items: center; gap: 12px;
+  background: var(--bg2); border-radius: var(--radius);
+  padding: 12px 14px; border: none; width: 100%; cursor: pointer;
+  transition: background .15s;
+}
+.person-select-btn:active { background: var(--bg3); }
+.avatar { width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; flex-shrink: 0; color: var(--accent-fg); background: var(--accent); }
+.person-meta { flex: 1; text-align: left; }
+.person-meta-label { font-size: 11px; color: var(--fg3); display: block; margin-bottom: 2px; }
+.person-meta-name { font-size: 15px; font-weight: 600; color: var(--fg); }
+.chevron-icon { color: var(--fg3); font-size: 14px; }
+
+/* AMOUNT INPUT */
+.amount-display {
+  display: flex; align-items: baseline; justify-content: center;
+  gap: 6px; padding: 24px 0 16px; cursor: pointer;
+}
+.amount-currency { font-family: var(--font-display); font-size: 28px; font-weight: 300; color: var(--fg2); }
+.amount-value { font-family: var(--font-display); font-size: 52px; font-weight: 700; letter-spacing: -2px; color: var(--fg); line-height: 1; }
+.amount-value.placeholder { color: var(--fg3); }
+
+/* FORM FIELDS */
+.field-row { display: flex; align-items: center; gap: 12px; padding: 13px 0; border-bottom: 1px solid var(--border); }
+.field-row:last-child { border-bottom: none; }
+.field-label { font-size: 13px; color: var(--fg2); width: 60px; flex-shrink: 0; }
+.field-input { flex: 1; font-size: 15px; color: var(--fg); background: none; border: none; outline: none; font-family: var(--font); }
+.field-input::placeholder { color: var(--fg3); }
+.field-icon { color: var(--fg3); font-size: 15px; }
+
+/* TAGS */
+.tags-wrap { display: flex; flex-wrap: wrap; gap: 7px; padding: 12px 0 4px; }
+.tag-btn { font-size: 11px; font-weight: 700; letter-spacing: 0.05em; padding: 6px 12px; border-radius: 30px; background: var(--bg3); color: var(--fg2); border: none; cursor: pointer; transition: all .15s; }
+.tag-btn.active { background: var(--accent); color: var(--accent-fg); }
+.tag-btn:active { transform: scale(0.95); }
+.tag-add-btn { font-size: 11px; font-weight: 700; padding: 6px 12px; border-radius: 30px; background: none; color: var(--fg3); border: 1.5px dashed var(--border2); cursor: pointer; }
+
+/* SAVE BUTTON */
+.btn-primary {
+  width: 100%; background: var(--accent); color: var(--accent-fg);
+  border: none; border-radius: var(--radius); padding: 16px; font-family: var(--font);
+  font-size: 15px; font-weight: 700; letter-spacing: 0.03em; cursor: pointer;
+  transition: transform .15s, opacity .15s; margin-top: 8px;
+}
+.btn-primary:active { transform: scale(0.97); opacity: 0.85; }
+.btn-primary:disabled { opacity: 0.35; }
+.btn-secondary {
+  width: 100%; background: var(--bg3); color: var(--fg);
+  border: none; border-radius: var(--radius); padding: 14px; font-family: var(--font);
+  font-size: 15px; font-weight: 600; cursor: pointer; transition: transform .15s;
+}
+.btn-secondary:active { transform: scale(0.97); }
+.btn-danger {
+  width: 100%; background: none; color: var(--danger);
+  border: none; border-radius: var(--radius); padding: 14px; font-family: var(--font);
+  font-size: 15px; font-weight: 600; cursor: pointer;
+}
+
+/* TRANSACTION LIST */
+.tx-list { padding: 0 20px; }
+.tx-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 13px 0; border-bottom: 1px solid var(--border);
+  cursor: pointer; transition: opacity .15s;
+}
+.tx-item:last-child { border-bottom: none; }
+.tx-item:active { opacity: 0.6; }
+.tx-date-col { text-align: center; min-width: 32px; }
+.tx-date-day { font-size: 17px; font-weight: 700; color: var(--fg); line-height: 1; }
+.tx-date-mon { font-size: 10px; color: var(--fg3); text-transform: uppercase; letter-spacing: 0.04em; }
+.tx-info { flex: 1; min-width: 0; }
+.tx-motive { font-size: 15px; font-weight: 500; color: var(--fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tx-tag-pill { display: inline-block; font-size: 9px; font-weight: 700; letter-spacing: 0.06em; padding: 2px 7px; border-radius: 20px; background: var(--bg3); color: var(--fg3); margin-top: 3px; }
+.tx-amount { font-size: 16px; font-weight: 700; letter-spacing: -0.5px; color: var(--fg); }
+.tx-edit { color: var(--fg3); font-size: 16px; padding: 4px; }
+.tx-empty { text-align: center; padding: 40px 20px; color: var(--fg3); font-size: 15px; line-height: 1.6; }
+
+/* WALLET CARD */
+.wallet-card {
+  display: flex; align-items: center; gap: 14px;
+  padding: 16px 20px; background: var(--bg2); border-radius: var(--radius);
+  margin: 0 20px 10px; cursor: pointer; transition: background .15s; border: none; width: calc(100% - 40px); text-align: left;
+}
+.wallet-card:active { background: var(--bg3); }
+.wallet-info { flex: 1; }
+.wallet-name { font-size: 16px; font-weight: 600; color: var(--fg); }
+.wallet-count { font-size: 12px; color: var(--fg3); margin-top: 2px; }
+.wallet-total { text-align: right; }
+.wallet-total-amount { font-size: 18px; font-weight: 700; letter-spacing: -0.5px; color: var(--fg); }
+.wallet-total-label { font-size: 10px; color: var(--fg3); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 1px; }
+
+/* MODAL / SHEET */
+.sheet-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.45);
+  z-index: 500; display: none; align-items: flex-end;
+  -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px);
+  animation: fadeIn .2s ease;
+}
+.sheet-overlay.open { display: flex; }
+.sheet {
+  background: var(--bg); border-radius: 24px 24px 0 0;
+  width: 100%; max-height: 90vh; overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 12px 20px calc(var(--safe-bottom) + 20px);
+  animation: slideUp .3s cubic-bezier(.32,1,.27,1);
+}
+.sheet::-webkit-scrollbar { display: none; }
+.sheet-handle { width: 36px; height: 4px; background: var(--bg3); border-radius: 2px; margin: 0 auto 20px; }
+.sheet-title { font-family: var(--font-display); font-size: 20px; font-weight: 700; margin-bottom: 20px; color: var(--fg); }
+@keyframes fadeIn { from { opacity:0 } to { opacity:1 } }
+@keyframes slideUp { from { transform: translateY(100%) } to { transform: translateY(0) } }
+
+/* NUMPAD */
+.numpad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px; }
+.numpad-key {
+  height: 60px; border-radius: var(--radius-sm); font-size: 22px; font-weight: 400;
+  background: var(--bg2); color: var(--fg); border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background .1s, transform .1s; font-family: var(--font-display);
+}
+.numpad-key:active { background: var(--bg3); transform: scale(0.94); }
+.numpad-key.zero { grid-column: span 1; }
+.numpad-key.del { background: var(--bg3); font-size: 18px; }
+.numpad-key.ok { background: var(--accent); color: var(--accent-fg); font-size: 16px; font-weight: 700; }
+
+/* TOAST */
+.toast {
+  position: fixed; bottom: calc(var(--tab-h) + var(--safe-bottom) + 16px);
+  left: 50%; transform: translateX(-50%) translateY(20px);
+  background: var(--fg); color: var(--accent-fg); font-size: 14px; font-weight: 500;
+  padding: 10px 20px; border-radius: 30px; z-index: 999;
+  opacity: 0; transition: all .3s cubic-bezier(.32,1,.27,1); white-space: nowrap;
+  pointer-events: none;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* SETTINGS */
+.setting-row { display: flex; align-items: center; gap: 14px; padding: 15px 0; border-bottom: 1px solid var(--border); }
+.setting-row:last-child { border-bottom: none; }
+.setting-icon { width: 34px; height: 34px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
+.setting-label { flex: 1; font-size: 16px; color: var(--fg); }
+.setting-value { font-size: 14px; color: var(--fg3); }
+.setting-arrow { color: var(--fg3); }
+
+/* INSTALL BANNER */
+.install-banner {
+  margin: 12px 20px 0; padding: 14px 16px; background: #0f0f0f; border-radius: var(--radius);
+  display: none; align-items: center; gap: 12px;
+}
+.install-banner.visible { display: flex; }
+.install-banner-text { flex: 1; color: #fff; font-size: 13px; line-height: 1.4; }
+.install-banner-text strong { font-size: 14px; display: block; margin-bottom: 2px; }
+.install-btn { background: #fff; color: #0f0f0f; border: none; border-radius: 8px; padding: 8px 14px; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+
+/* PERSON LIST in sheet */
+.person-list-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 13px 0; border-bottom: 1px solid var(--border); cursor: pointer;
+  transition: opacity .15s; background: none; border-left: none; border-right: none; border-top: none; width: 100%; text-align: left;
+}
+.person-list-item:active { opacity: 0.6; }
+.person-list-item:last-child { border-bottom: none; }
+.person-list-item .check { color: var(--fg); font-size: 18px; margin-left: auto; }
+
+/* EMPTY STATE */
+.empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 30px; text-align: center; gap: 12px; }
+.empty-icon { font-size: 48px; opacity: 0.3; }
+.empty-title { font-size: 18px; font-weight: 600; color: var(--fg); }
+.empty-sub { font-size: 14px; color: var(--fg3); line-height: 1.5; }
+
+/* WALLET DETAIL */
+.wallet-detail-header { padding: 0 20px 16px; border-bottom: 1px solid var(--border); }
+.wallet-total-big { font-family: var(--font-display); font-size: 38px; font-weight: 700; letter-spacing: -1.5px; color: var(--fg); }
+.wallet-total-sub { font-size: 13px; color: var(--fg3); margin-top: 4px; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- PAGE: GASTO RÁPIDO -->
+  <section class="page active" id="page-gasto">
+    <div class="topbar">
+      <div>
+        <div class="topbar-title">Gasto Rápido</div>
+        <div class="topbar-sub" id="today-label"></div>
+      </div>
+      <button class="topbar-action" onclick="openPersonSheet()" title="Cambiar persona">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      </button>
+    </div>
+    <div class="scroll-area">
+      <div id="install-banner" class="install-banner">
+        <div class="install-banner-text"><strong>📲 Instalar como app</strong>Toca Compartir → "Añadir a pantalla de inicio"</div>
+        <button class="install-btn" onclick="closeBanner()">Entendido</button>
+      </div>
+      <div class="section" style="margin-top:12px;">
+        <!-- Person selector -->
+        <div class="section-label">Cobrar a</div>
+        <button class="person-select-btn" onclick="openPersonSheet()" id="person-select-btn">
+          <div class="avatar" id="person-avatar">?</div>
+          <div class="person-meta">
+            <span class="person-meta-label">Persona (Cobrar a)</span>
+            <span class="person-meta-name" id="person-select-name">Seleccionar persona</span>
+          </div>
+          <span class="chevron-icon">›</span>
+        </button>
+      </div>
+      <!-- Amount -->
+      <div class="section" style="margin-top:4px;">
+        <div class="amount-display" onclick="openNumpad()">
+          <span class="amount-currency">S/.</span>
+          <span class="amount-value placeholder" id="amount-display">0.00</span>
+        </div>
+      </div>
+      <!-- Fields -->
+      <div class="section">
+        <div class="card-white" style="padding:12px 16px;">
+          <div class="field-row">
+            <span class="field-label">Motivo</span>
+            <input class="field-input" id="field-motivo" placeholder="Ej: Uber a oficina" maxlength="60">
+            <span class="field-icon">✏️</span>
+          </div>
+          <div class="field-row" style="padding-bottom:8px;border-bottom:none;">
+            <span class="field-label" style="align-self:flex-start;padding-top:6px;">Tags</span>
+            <div style="flex:1;">
+              <div class="tags-wrap" id="tags-container"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- Save button -->
+      <div class="section">
+        <button class="btn-primary" id="save-btn" onclick="saveGasto()">GUARDAR EN MONEDERO</button>
+      </div>
+      <!-- History preview -->
+      <div class="section" style="margin-top:16px;">
+        <div class="section-label" id="historial-label">Historial reciente</div>
+      </div>
+      <div class="tx-list" id="historial-list"></div>
+      <div style="height:24px;"></div>
+    </div>
+  </section>
+
+  <!-- PAGE: MONEDEROS -->
+  <section class="page" id="page-monederos">
+    <div class="topbar">
+      <div>
+        <div class="topbar-title">Monederos</div>
+        <div class="topbar-sub" id="wallets-sub">Resumen por persona</div>
+      </div>
+      <button class="topbar-action" onclick="openAddPersonSheet()" title="Agregar persona">+</button>
+    </div>
+    <div class="scroll-area" style="padding-top:16px;">
+      <div id="wallets-list"></div>
+      <div style="height:24px;"></div>
+    </div>
+  </section>
+
+  <!-- PAGE: AJUSTES -->
+  <section class="page" id="page-ajustes">
+    <div class="topbar">
+      <div><div class="topbar-title">Ajustes</div></div>
+    </div>
+    <div class="scroll-area">
+      <div class="section" style="margin-top:20px;">
+        <div class="section-label">General</div>
+        <div class="card-white" style="padding:0 16px;">
+          <div class="setting-row">
+            <div class="setting-icon" style="background:#e8f5e9;">💰</div>
+            <span class="setting-label">Moneda</span>
+            <span class="setting-value">S/. (Sol)</span>
+            <span class="setting-arrow">›</span>
+          </div>
+          <div class="setting-row" onclick="openAddPersonSheet()">
+            <div class="setting-icon" style="background:#e3f2fd;">👥</div>
+            <span class="setting-label">Personas</span>
+            <span class="setting-value" id="persons-count">0 personas</span>
+            <span class="setting-arrow">›</span>
+          </div>
+          <div class="setting-row" onclick="openTagsSheet()">
+            <div class="setting-icon" style="background:#fce4ec;">🏷️</div>
+            <span class="setting-label">Categorías</span>
+            <span class="setting-value">Gestionar tags</span>
+            <span class="setting-arrow">›</span>
+          </div>
+        </div>
+      </div>
+      <div class="section" style="margin-top:8px;">
+        <div class="section-label">Datos</div>
+        <div class="card-white" style="padding:0 16px;">
+          <div class="setting-row" onclick="exportData()">
+            <div class="setting-icon" style="background:#f3e5f5;">📤</div>
+            <span class="setting-label">Exportar datos</span>
+            <span class="setting-arrow">›</span>
+          </div>
+          <div class="setting-row" onclick="confirmClearAll()">
+            <div class="setting-icon" style="background:#ffebee;">🗑️</div>
+            <span class="setting-label" style="color:var(--danger);">Borrar todo</span>
+            <span class="setting-arrow">›</span>
+          </div>
+        </div>
+      </div>
+      <div class="section" style="margin-top:8px;">
+        <div class="card" style="text-align:center;padding:20px;">
+          <div style="font-size:13px;color:var(--fg3);line-height:1.6;">
+            <strong style="color:var(--fg);font-size:15px;">📲 Instalar como app</strong><br>
+            En Safari: Compartir <strong>→</strong> "Añadir a pantalla de inicio"<br>Funciona 100% sin internet.
+          </div>
+        </div>
+      </div>
+      <div style="height:24px;"></div>
+    </div>
+  </section>
+
+  <!-- BOTTOM NAV -->
+  <nav class="bottom-nav">
+    <button class="nav-btn active" id="nav-gasto" onclick="switchPage('gasto')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 5v14M5 12h14"/>
+      </svg>
+      <span class="nav-label">Gasto Rápido</span>
+    </button>
+    <button class="nav-btn" id="nav-monederos" onclick="switchPage('monederos')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 12V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-2"/>
+        <path d="M16 12a2 2 0 0 0 0 4h5v-4h-5z"/>
+      </svg>
+      <span class="nav-label">Monederos</span>
+    </button>
+    <button class="nav-btn" id="nav-ajustes" onclick="switchPage('ajustes')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+      </svg>
+      <span class="nav-label">Ajustes</span>
+    </button>
+  </nav>
+
+  <!-- TOAST -->
+  <div class="toast" id="toast"></div>
+</div>
+
+<!-- SHEET: PERSON SELECT -->
+<div class="sheet-overlay" id="sheet-person" onclick="closeSheetIf(event,'sheet-person')">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">Seleccionar Persona</div>
+    <div id="person-list-container"></div>
+    <button class="btn-secondary" style="margin-top:16px;" onclick="openAddPersonSheet()">+ Nueva Persona</button>
+  </div>
+</div>
+
+<!-- SHEET: ADD PERSON -->
+<div class="sheet-overlay" id="sheet-add-person" onclick="closeSheetIf(event,'sheet-add-person')">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">Nueva Persona</div>
+    <div class="card-white" style="padding:8px 16px;">
+      <div class="field-row" style="border:none;padding:8px 0;">
+        <span class="field-label">Nombre</span>
+        <input class="field-input" id="new-person-name" placeholder="Ej: María López" maxlength="40" autocomplete="off">
+      </div>
+    </div>
+    <button class="btn-primary" style="margin-top:16px;" onclick="addPerson()">Agregar Persona</button>
+    <button class="btn-secondary" style="margin-top:8px;" onclick="closeSheet('sheet-add-person')">Cancelar</button>
+  </div>
+</div>
+
+<!-- SHEET: NUMPAD -->
+<div class="sheet-overlay" id="sheet-numpad" onclick="closeSheetIf(event,'sheet-numpad')">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div style="text-align:center;padding:8px 0 16px;">
+      <div style="font-size:13px;color:var(--fg3);margin-bottom:8px;">Ingresa el monto</div>
+      <div style="font-family:var(--font-display);font-size:42px;font-weight:700;letter-spacing:-2px;color:var(--fg);">
+        S/. <span id="numpad-display">0.00</span>
+      </div>
+    </div>
+    <div class="numpad">
+      <button class="numpad-key" onclick="numpadPress('1')">1</button>
+      <button class="numpad-key" onclick="numpadPress('2')">2</button>
+      <button class="numpad-key" onclick="numpadPress('3')">3</button>
+      <button class="numpad-key" onclick="numpadPress('4')">4</button>
+      <button class="numpad-key" onclick="numpadPress('5')">5</button>
+      <button class="numpad-key" onclick="numpadPress('6')">6</button>
+      <button class="numpad-key" onclick="numpadPress('7')">7</button>
+      <button class="numpad-key" onclick="numpadPress('8')">8</button>
+      <button class="numpad-key" onclick="numpadPress('9')">9</button>
+      <button class="numpad-key" onclick="numpadPress('.')">.</button>
+      <button class="numpad-key" onclick="numpadPress('0')">0</button>
+      <button class="numpad-key del" onclick="numpadPress('del')">⌫</button>
+      <button class="numpad-key ok" style="grid-column:span 3;" onclick="confirmAmount()">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<!-- SHEET: TRANSACTION EDIT -->
+<div class="sheet-overlay" id="sheet-tx" onclick="closeSheetIf(event,'sheet-tx')">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title" id="sheet-tx-title">Editar Gasto</div>
+    <div class="card-white" style="padding:12px 16px;">
+      <div class="field-row">
+        <span class="field-label">Motivo</span>
+        <input class="field-input" id="edit-motivo" maxlength="60">
+      </div>
+      <div class="field-row">
+        <span class="field-label">Monto</span>
+        <input class="field-input" id="edit-monto" type="number" step="0.01" min="0">
+      </div>
+      <div class="field-row" style="border:none;flex-wrap:wrap;gap:8px;">
+        <span class="field-label">Tag</span>
+        <div class="tags-wrap" id="edit-tags-container" style="padding:4px 0;"></div>
+      </div>
+    </div>
+    <button class="btn-primary" style="margin-top:16px;" onclick="saveEditTx()">Guardar Cambios</button>
+    <button class="btn-danger" style="margin-top:4px;" onclick="deleteTx()">Eliminar Gasto</button>
+    <button class="btn-secondary" style="margin-top:4px;" onclick="closeSheet('sheet-tx')">Cancelar</button>
+  </div>
+</div>
+
+<!-- SHEET: WALLET DETAIL -->
+<div class="sheet-overlay" id="sheet-wallet" onclick="closeSheetIf(event,'sheet-wallet')">
+  <div class="sheet" style="max-height:92vh;">
+    <div class="sheet-handle"></div>
+    <div id="wallet-detail-content"></div>
+  </div>
+</div>
+
+<!-- SHEET: TAGS MGMT -->
+<div class="sheet-overlay" id="sheet-tags" onclick="closeSheetIf(event,'sheet-tags')">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">Gestionar Categorías</div>
+    <div id="tags-mgmt-list"></div>
+    <div class="card-white" style="padding:8px 16px;margin-top:8px;">
+      <div class="field-row" style="border:none;padding:8px 0;">
+        <span class="field-label">Nueva</span>
+        <input class="field-input" id="new-tag-input" placeholder="Ej: TRANSPORTE" maxlength="20" style="text-transform:uppercase;">
+      </div>
+    </div>
+    <button class="btn-primary" style="margin-top:12px;" onclick="addTag()">Agregar Categoría</button>
+    <button class="btn-secondary" style="margin-top:8px;" onclick="closeSheet('sheet-tags')">Listo</button>
+  </div>
+</div>
+
+<script>
+// ─── STATE ───────────────────────────────────────────────────────────────────
+const DEFAULT_TAGS = ['PASAJES','COMIDA','OTROS','SERVICIOS','COMPRAS'];
+let state = {
+  persons: [],
+  transactions: [],
+  tags: [...DEFAULT_TAGS],
+  selectedPersonId: null,
+  selectedTag: 'PASAJES'
+};
+let numpadRaw = '';
+let currentAmount = 0;
+let editingTxId = null;
+let viewingPersonId = null;
+let editSelectedTag = '';
+
+// ─── STORAGE ─────────────────────────────────────────────────────────────────
+function save() { localStorage.setItem('monedero_state', JSON.stringify(state)); }
+function load() {
+  try {
+    const s = localStorage.getItem('monedero_state');
+    if (s) state = { ...state, ...JSON.parse(s) };
+    if (!state.tags || !state.tags.length) state.tags = [...DEFAULT_TAGS];
+  } catch(e) {}
+}
+
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+function initials(name) { return name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2); }
+function fmtAmount(n) { return 'S/. ' + n.toFixed(2); }
+function fmtDate(iso) {
+  const d = new Date(iso + 'T12:00:00');
+  return { day: d.getDate(), mon: d.toLocaleDateString('es-PE',{month:'short'}).replace('.','') };
+}
+function todayISO() { return new Date().toISOString().split('T')[0]; }
+function avatarColor(id) {
+  const colors = ['#0f0f0f','#1a56db','#0e9f6e','#9061f9','#e74694','#f05252','#ff8c00'];
+  let h = 0; for(let c of id) h = (h*31 + c.charCodeAt(0)) | 0;
+  return colors[Math.abs(h) % colors.length];
+}
+function vibrate() { try { navigator.vibrate && navigator.vibrate(10); } catch(e){} }
+
+// ─── TOAST ───────────────────────────────────────────────────────────────────
+let toastTimer;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+// ─── PAGES ───────────────────────────────────────────────────────────────────
+function switchPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  document.getElementById('nav-' + name).classList.add('active');
+  if (name === 'monederos') renderWallets();
+  if (name === 'gasto') renderHistorial();
+  if (name === 'ajustes') renderAjustes();
+}
+
+// ─── SHEETS ──────────────────────────────────────────────────────────────────
+function openSheet(id) { document.getElementById(id).classList.add('open'); }
+function closeSheet(id) { document.getElementById(id).classList.remove('open'); }
+function closeSheetIf(e, id) { if (e.target === document.getElementById(id)) closeSheet(id); }
+
+// ─── PERSONS ─────────────────────────────────────────────────────────────────
+function openPersonSheet() {
+  const c = document.getElementById('person-list-container');
+  if (!state.persons.length) {
+    c.innerHTML = '<div class="tx-empty">Aún no tienes personas.<br>Agrega una primero.</div>';
+  } else {
+    c.innerHTML = state.persons.map(p => `
+      <button class="person-list-item" onclick="selectPerson('${p.id}')">
+        <div class="avatar" style="background:${avatarColor(p.id)}">${initials(p.name)}</div>
+        <span style="font-size:16px;font-weight:500;color:var(--fg);">${p.name}</span>
+        ${state.selectedPersonId === p.id ? '<span class="check">✓</span>' : ''}
+      </button>`).join('');
+  }
+  openSheet('sheet-person');
+}
+
+function selectPerson(id) {
+  state.selectedPersonId = id; save();
+  updatePersonDisplay(); renderHistorial(); closeSheet('sheet-person');
+  vibrate();
+}
+
+function openAddPersonSheet() {
+  closeSheet('sheet-person');
+  document.getElementById('new-person-name').value = '';
+  openSheet('sheet-add-person');
+  setTimeout(() => document.getElementById('new-person-name').focus(), 350);
+}
+
+function addPerson() {
+  const name = document.getElementById('new-person-name').value.trim();
+  if (!name) { showToast('Ingresa un nombre'); return; }
+  if (state.persons.find(p => p.name.toLowerCase() === name.toLowerCase())) {
+    showToast('Ya existe esa persona'); return;
+  }
+  const p = { id: uid(), name };
+  state.persons.push(p);
+  if (!state.selectedPersonId) state.selectedPersonId = p.id;
+  save(); updatePersonDisplay(); renderHistorial();
+  closeSheet('sheet-add-person'); showToast(`✓ ${name} agregado`); vibrate();
+  renderAjustes();
+}
+
+function updatePersonDisplay() {
+  const p = state.persons.find(x => x.id === state.selectedPersonId);
+  if (p) {
+    document.getElementById('person-avatar').textContent = initials(p.name);
+    document.getElementById('person-avatar').style.background = avatarColor(p.id);
+    document.getElementById('person-select-name').textContent = p.name;
+    document.getElementById('historial-label').textContent = `Historial — ${p.name}`;
+  } else {
+    document.getElementById('person-avatar').textContent = '?';
+    document.getElementById('person-avatar').style.background = 'var(--bg3)';
+    document.getElementById('person-select-name').textContent = 'Seleccionar persona';
+    document.getElementById('historial-label').textContent = 'Historial reciente';
+  }
+}
+
+// ─── AMOUNT / NUMPAD ─────────────────────────────────────────────────────────
+function openNumpad() {
+  numpadRaw = currentAmount > 0 ? (currentAmount * 100).toFixed(0) : '';
+  updateNumpadDisplay();
+  openSheet('sheet-numpad');
+}
+
+function numpadPress(key) {
+  vibrate();
+  if (key === 'del') { numpadRaw = numpadRaw.slice(0,-1); }
+  else if (key === '.') { return; }
+  else {
+    if (numpadRaw.length >= 8) return;
+    numpadRaw += key;
+  }
+  updateNumpadDisplay();
+}
+
+function updateNumpadDisplay() {
+  const val = numpadRaw ? (parseInt(numpadRaw) / 100).toFixed(2) : '0.00';
+  document.getElementById('numpad-display').textContent = val;
+}
+
+function confirmAmount() {
+  currentAmount = numpadRaw ? parseInt(numpadRaw) / 100 : 0;
+  const el = document.getElementById('amount-display');
+  el.textContent = currentAmount > 0 ? currentAmount.toFixed(2) : '0.00';
+  el.classList.toggle('placeholder', currentAmount === 0);
+  closeSheet('sheet-numpad'); vibrate();
+}
+
+// ─── TAGS ────────────────────────────────────────────────────────────────────
+function renderTagsInForm() {
+  const c = document.getElementById('tags-container');
+  c.innerHTML = state.tags.map(t => `
+    <button class="tag-btn ${t === state.selectedTag ? 'active' : ''}" onclick="selectTag('${t}')">${t}</button>
+  `).join('') + `<button class="tag-add-btn" onclick="openTagsSheet()">+</button>`;
+}
+
+function selectTag(t) { state.selectedTag = t; renderTagsInForm(); vibrate(); }
+
+function renderEditTags(selected) {
+  editSelectedTag = selected || state.tags[0];
+  const c = document.getElementById('edit-tags-container');
+  c.innerHTML = state.tags.map(t => `
+    <button class="tag-btn ${t === editSelectedTag ? 'active' : ''}" onclick="selectEditTag('${t}')">${t}</button>
+  `).join('');
+}
+
+function selectEditTag(t) { editSelectedTag = t; renderEditTags(t); vibrate(); }
+
+function openTagsSheet() {
+  renderTagsMgmt();
+  closeSheet('sheet-person');
+  openSheet('sheet-tags');
+}
+
+function renderTagsMgmt() {
+  const c = document.getElementById('tags-mgmt-list');
+  c.innerHTML = '<div class="card-white" style="padding:0 16px;">' +
+    state.tags.map((t,i) => `
+      <div class="field-row" style="${i===state.tags.length-1?'border:none':''}">
+        <span class="tag-btn active" style="cursor:default;">${t}</span>
+        <span style="flex:1;"></span>
+        ${i >= DEFAULT_TAGS.length ? `<button onclick="removeTag('${t}')" style="color:var(--danger);background:none;border:none;font-size:20px;cursor:pointer;padding:4px;">×</button>` : ''}
+      </div>`).join('') + '</div>';
+  document.getElementById('new-tag-input').value = '';
+}
+
+function addTag() {
+  const v = document.getElementById('new-tag-input').value.trim().toUpperCase();
+  if (!v) return;
+  if (state.tags.includes(v)) { showToast('Ya existe esa categoría'); return; }
+  state.tags.push(v); save(); renderTagsMgmt(); renderTagsInForm();
+  showToast(`✓ Categoría "${v}" agregada`); vibrate();
+}
+
+function removeTag(t) {
+  state.tags = state.tags.filter(x => x !== t);
+  if (state.selectedTag === t) state.selectedTag = state.tags[0] || '';
+  save(); renderTagsMgmt(); renderTagsInForm();
+}
+
+// ─── SAVE GASTO ──────────────────────────────────────────────────────────────
+function saveGasto() {
+  if (!state.selectedPersonId) { showToast('Selecciona una persona primero'); return; }
+  if (currentAmount <= 0) { showToast('Ingresa un monto'); openNumpad(); return; }
+  const motivo = document.getElementById('field-motivo').value.trim() || 'Sin descripción';
+  const tx = {
+    id: uid(),
+    personId: state.selectedPersonId,
+    motive: motivo,
+    amount: currentAmount,
+    category: state.selectedTag || 'OTROS',
+    date: todayISO()
+  };
+  state.transactions.unshift(tx); save();
+  // Reset form
+  currentAmount = 0; numpadRaw = '';
+  document.getElementById('amount-display').textContent = '0.00';
+  document.getElementById('amount-display').classList.add('placeholder');
+  document.getElementById('field-motivo').value = '';
+  renderHistorial(); showToast('✓ Gasto guardado'); vibrate();
+}
+
+// ─── HISTORIAL ───────────────────────────────────────────────────────────────
+function renderHistorial() {
+  const c = document.getElementById('historial-list');
+  const txs = state.transactions.filter(t => !state.selectedPersonId || t.personId === state.selectedPersonId).slice(0,15);
+  if (!txs.length) {
+    c.innerHTML = '<div class="tx-empty">Sin gastos registrados.<br>¡Agrega el primero! 👆</div>'; return;
+  }
+  c.innerHTML = txs.map(tx => {
+    const d = fmtDate(tx.date);
+    return `<div class="tx-item" onclick="openEditTx('${tx.id}')">
+      <div class="tx-date-col"><div class="tx-date-day">${d.day}</div><div class="tx-date-mon">${d.mon}</div></div>
+      <div class="tx-info">
+        <div class="tx-motive">${tx.motive}</div>
+        <span class="tx-tag-pill">${tx.category}</span>
+      </div>
+      <div class="tx-amount">${tx.amount.toFixed(2)}</div>
+      <div class="tx-edit">›</div>
+    </div>`;
+  }).join('');
+}
+
+// ─── EDIT TX ─────────────────────────────────────────────────────────────────
+function openEditTx(id) {
+  editingTxId = id;
+  const tx = state.transactions.find(t => t.id === id);
+  if (!tx) return;
+  const p = state.persons.find(x => x.id === tx.personId);
+  document.getElementById('sheet-tx-title').textContent = p ? `Gasto — ${p.name}` : 'Editar Gasto';
+  document.getElementById('edit-motivo').value = tx.motive;
+  document.getElementById('edit-monto').value = tx.amount.toFixed(2);
+  renderEditTags(tx.category);
+  openSheet('sheet-tx');
+}
+
+function saveEditTx() {
+  const tx = state.transactions.find(t => t.id === editingTxId);
+  if (!tx) return;
+  const m = parseFloat(document.getElementById('edit-monto').value);
+  if (isNaN(m) || m < 0) { showToast('Monto inválido'); return; }
+  tx.motive = document.getElementById('edit-motivo').value.trim() || 'Sin descripción';
+  tx.amount = m; tx.category = editSelectedTag;
+  save(); renderHistorial(); renderWallets();
+  closeSheet('sheet-tx'); showToast('✓ Cambios guardados'); vibrate();
+}
+
+function deleteTx() {
+  if (!confirm('¿Eliminar este gasto?')) return;
+  state.transactions = state.transactions.filter(t => t.id !== editingTxId);
+  save(); renderHistorial(); renderWallets();
+  closeSheet('sheet-tx'); showToast('Gasto eliminado'); vibrate();
+}
+
+// ─── WALLETS ─────────────────────────────────────────────────────────────────
+function renderWallets() {
+  const c = document.getElementById('wallets-list');
+  if (!state.persons.length) {
+    c.innerHTML = `<div class="empty-state"><div class="empty-icon">👛</div><div class="empty-title">Sin personas aún</div><div class="empty-sub">Toca el + para agregar<br>a alguien a tus monederos.</div></div>`;
+    return;
+  }
+  c.innerHTML = state.persons.map(p => {
+    const txs = state.transactions.filter(t => t.personId === p.id);
+    const total = txs.reduce((s,t) => s+t.amount, 0);
+    return `<button class="wallet-card" onclick="openWalletDetail('${p.id}')">
+      <div class="avatar" style="background:${avatarColor(p.id)};width:46px;height:46px;font-size:16px;">${initials(p.name)}</div>
+      <div class="wallet-info">
+        <div class="wallet-name">${p.name}</div>
+        <div class="wallet-count">${txs.length} gasto${txs.length !== 1 ? 's' : ''}</div>
+      </div>
+      <div class="wallet-total">
+        <div class="wallet-total-amount">${total.toFixed(2)}</div>
+        <div class="wallet-total-label">S/. total</div>
+      </div>
+    </button>`;
+  }).join('');
+}
+
+function openWalletDetail(personId) {
+  viewingPersonId = personId;
+  const p = state.persons.find(x => x.id === personId);
+  const txs = state.transactions.filter(t => t.personId === personId);
+  const total = txs.reduce((s,t) => s+t.amount, 0);
+  const c = document.getElementById('wallet-detail-content');
+  const txHtml = txs.length ? txs.map(tx => {
+    const d = fmtDate(tx.date);
+    return `<div class="tx-item" onclick="openEditTx('${tx.id}');closeSheet('sheet-wallet');">
+      <div class="tx-date-col"><div class="tx-date-day">${d.day}</div><div class="tx-date-mon">${d.mon}</div></div>
+      <div class="tx-info">
+        <div class="tx-motive">${tx.motive}</div>
+        <span class="tx-tag-pill">${tx.category}</span>
+      </div>
+      <div class="tx-amount">${tx.amount.toFixed(2)}</div>
+      <div class="tx-edit">›</div>
+    </div>`;
+  }).join('') : '<div class="tx-empty">Sin gastos para esta persona.</div>';
+  c.innerHTML = `
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+      <div class="avatar" style="background:${avatarColor(p.id)};width:48px;height:48px;font-size:18px;">${initials(p.name)}</div>
+      <div>
+        <div style="font-size:20px;font-weight:700;color:var(--fg);">${p.name}</div>
+        <div style="font-size:13px;color:var(--fg3);">${txs.length} gasto${txs.length!==1?'s':''}</div>
+      </div>
+    </div>
+    <div class="wallet-detail-header" style="margin:0 -20px;padding:0 20px 16px;">
+      <div class="wallet-total-big">${total.toFixed(2)}</div>
+      <div class="wallet-total-sub">S/. total acumulado</div>
+    </div>
+    <div style="margin:0 -20px;">
+      <div class="tx-list" style="padding:0 20px;">${txHtml}</div>
+    </div>
+    <button onclick="deletePerson('${p.id}')" style="margin-top:20px;width:100%;background:none;color:var(--danger);border:none;padding:12px;font-size:15px;font-weight:600;cursor:pointer;">Eliminar Persona</button>
+    <button onclick="closeSheet('sheet-wallet')" class="btn-secondary" style="margin-top:4px;">Cerrar</button>
+  `;
+  openSheet('sheet-wallet');
+}
+
+function deletePerson(id) {
+  if (!confirm('¿Eliminar esta persona y todos sus gastos?')) return;
+  state.persons = state.persons.filter(p => p.id !== id);
+  state.transactions = state.transactions.filter(t => t.personId !== id);
+  if (state.selectedPersonId === id) state.selectedPersonId = state.persons[0]?.id || null;
+  save(); closeSheet('sheet-wallet'); renderWallets(); updatePersonDisplay(); renderHistorial();
+  showToast('Persona eliminada'); vibrate();
+}
+
+// ─── AJUSTES ─────────────────────────────────────────────────────────────────
+function renderAjustes() {
+  document.getElementById('persons-count').textContent = `${state.persons.length} persona${state.persons.length!==1?'s':''}`;
+}
+
+function exportData() {
+  const data = JSON.stringify(state, null, 2);
+  const blob = new Blob([data], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url;
+  a.download = `monedero-backup-${todayISO()}.json`; a.click();
+  URL.revokeObjectURL(url); showToast('✓ Datos exportados');
+}
+
+function confirmClearAll() {
+  if (!confirm('¿Borrar TODOS los datos? Esta acción no se puede deshacer.')) return;
+  state = { persons:[], transactions:[], tags:[...DEFAULT_TAGS], selectedPersonId:null, selectedTag:'PASAJES' };
+  save(); updatePersonDisplay(); renderHistorial(); renderWallets(); renderTagsInForm(); renderAjustes();
+  showToast('Datos borrados'); vibrate();
+}
+
+function closeBanner() {
+  document.getElementById('install-banner').style.display = 'none';
+  localStorage.setItem('banner_closed','1');
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+function init() {
+  load();
+  // Today label
+  const now = new Date();
+  document.getElementById('today-label').textContent = now.toLocaleDateString('es-PE',{weekday:'long',day:'numeric',month:'long'});
+  // Render
+  updatePersonDisplay(); renderTagsInForm(); renderHistorial(); renderWallets(); renderAjustes();
+  // Install banner (show only if not standalone and not closed before)
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+  if (!isStandalone && !localStorage.getItem('banner_closed')) {
+    document.getElementById('install-banner').classList.add('visible');
+  }
+  // Service worker
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+  }
+  // Enter on new person
+  document.getElementById('new-person-name').addEventListener('keydown', e => { if(e.key==='Enter') addPerson(); });
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
