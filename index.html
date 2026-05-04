@@ -197,6 +197,7 @@ body { display: flex; flex-direction: column; }
   z-index: 500; display: none; align-items: flex-end;
   -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px);
   animation: fadeIn .2s ease;
+  overscroll-behavior: none; /* <-- NUEVO: Evita la fuga de scroll hacia el fondo */
 }
 .sheet-overlay.open { display: flex; }
 .sheet {
@@ -219,6 +220,7 @@ body { display: flex; flex-direction: column; }
   background: var(--bg2); color: var(--fg); border: none; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
   transition: background .1s, transform .1s; font-family: var(--font-display);
+  touch-action: manipulation; /* <-- NUEVO: Cancela el retraso de toque y evita el zoom doble */
 }
 .numpad-key:active { background: var(--bg3); transform: scale(0.94); }
 .numpad-key.zero { grid-column: span 1; }
@@ -495,6 +497,15 @@ body { display: flex; flex-direction: column; }
   </div>
 </div>
 
+
+<!-- SHEET: WALLET DETAIL -->
+<div class="sheet-overlay" id="sheet-wallet" onclick="closeSheetIf(event,'sheet-wallet')">
+  <div class="sheet" style="max-height:92vh;">
+    <div class="sheet-handle"></div>
+    <div id="wallet-detail-content"></div>
+  </div>
+</div>
+
 <!-- SHEET: TRANSACTION EDIT -->
 <div class="sheet-overlay" id="sheet-tx" onclick="closeSheetIf(event,'sheet-tx')">
   <div class="sheet">
@@ -516,17 +527,10 @@ body { display: flex; flex-direction: column; }
     </div>
     <button class="btn-primary" style="margin-top:16px;" onclick="saveEditTx()">Guardar Cambios</button>
     <button class="btn-danger" style="margin-top:4px;" onclick="deleteTx()">Eliminar Gasto</button>
-    <button class="btn-secondary" style="margin-top:4px;" onclick="closeSheet('sheet-tx')">Cancelar</button>
+    <<button class="btn-secondary" style="margin-top:4px;" onclick="cancelEditTx()">Cancelar</button>
   </div>
 </div>
 
-<!-- SHEET: WALLET DETAIL -->
-<div class="sheet-overlay" id="sheet-wallet" onclick="closeSheetIf(event,'sheet-wallet')">
-  <div class="sheet" style="max-height:92vh;">
-    <div class="sheet-handle"></div>
-    <div id="wallet-detail-content"></div>
-  </div>
-</div>
 
 <!-- SHEET: TAGS MGMT -->
 <div class="sheet-overlay" id="sheet-tags" onclick="closeSheetIf(event,'sheet-tags')">
@@ -542,6 +546,31 @@ body { display: flex; flex-direction: column; }
     </div>
     <button class="btn-primary" style="margin-top:12px;" onclick="addTag()">Agregar Categoría</button>
     <button class="btn-secondary" style="margin-top:8px;" onclick="closeSheet('sheet-tags')">Listo</button>
+  </div>
+</div>
+
+<!-- SHEET: EDIT BUDGET -->
+<div class="sheet-overlay" id="sheet-budget" onclick="closeSheetIf(event,'sheet-budget')">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">Editar Presupuesto</div>
+    <div class="card-white" style="padding:12px 16px;">
+      <div class="field-row">
+        <span class="field-label" style="width:100px;">Soles (S/.)</span>
+        <input class="field-input" id="edit-budget-soles" type="number" placeholder="Ej: 1000">
+      </div>
+      <div class="field-row">
+        <span class="field-label" style="width:100px;">Dólares ($)</span>
+        <input class="field-input" id="edit-budget-dollars" type="number" placeholder="Ej: 350">
+      </div>
+      <div class="field-row" style="border:none;">
+        <span class="field-label" style="width:100px;">Tipo Cambio</span>
+        <input class="field-input" id="edit-budget-tc" type="number" step="0.01" placeholder="Ej: 3.35">
+      </div>
+    </div>
+    <div style="font-size:12px; color:var(--fg3); text-align:center; padding-bottom:12px;">* Valores manuales. No se realizan cálculos automáticos.</div>
+    <button class="btn-primary" onclick="saveBudget()">Guardar Presupuesto</button>
+    <button class="btn-secondary" style="margin-top:8px;" onclick="closeSheet('sheet-budget')">Cancelar</button>
   </div>
 </div>
 
@@ -576,10 +605,16 @@ function uid() { return Date.now().toString(36) + Math.random().toString(36).sli
 function initials(name) { return name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2); }
 function fmtAmount(n) { return 'S/. ' + n.toFixed(2); }
 function fmtDate(iso) {
-  const d = new Date(iso + 'T12:00:00');
-  return { day: d.getDate(), mon: d.toLocaleDateString('es-PE',{month:'short'}).replace('.','') };
+  // Manejamos el formato antiguo (solo fecha) y el nuevo (fecha y hora)
+  const d = new Date(iso.includes('T') ? iso : iso + 'T12:00:00');
+  const timeStr = iso.includes('T') ? d.toLocaleTimeString('es-PE', {hour: '2-digit', minute:'2-digit'}) : '';
+  return { 
+    day: d.getDate(), 
+    mon: d.toLocaleDateString('es-PE',{month:'short'}).replace('.',''),
+    time: timeStr
+  };
 }
-function todayISO() { return new Date().toISOString().split('T')[0]; }
+function todayISO() { return new Date().toISOString(); } // Guardamos la fecha y hora completas
 function avatarColor(id) {
   const colors = ['#0f0f0f','#1a56db','#0e9f6e','#9061f9','#e74694','#f05252','#ff8c00'];
   let h = 0; for(let c of id) h = (h*31 + c.charCodeAt(0)) | 0;
@@ -608,8 +643,17 @@ function switchPage(name) {
 }
 
 // ─── SHEETS ──────────────────────────────────────────────────────────────────
-function openSheet(id) { document.getElementById(id).classList.add('open'); }
-function closeSheet(id) { document.getElementById(id).classList.remove('open'); }
+function openSheet(id) { 
+  document.getElementById(id).classList.add('open'); 
+  // Oculta el scroll de todas las áreas desplazables de fondo
+  document.querySelectorAll('.scroll-area').forEach(el => el.style.overflowY = 'hidden');
+}
+
+function closeSheet(id) { 
+  document.getElementById(id).classList.remove('open'); 
+  // Restaura el comportamiento normal del scroll
+  document.querySelectorAll('.scroll-area').forEach(el => el.style.overflowY = '');
+}
 function closeSheetIf(e, id) { if (e.target === document.getElementById(id)) closeSheet(id); }
 
 // ─── PERSONS ─────────────────────────────────────────────────────────────────
@@ -650,7 +694,8 @@ function addPerson() {
   const p = { id: uid(), name };
   state.persons.push(p);
   if (!state.selectedPersonId) state.selectedPersonId = p.id;
-  save(); updatePersonDisplay(); renderHistorial();
+save(); updatePersonDisplay(); renderHistorial(); renderWallets(); 
+  
   closeSheet('sheet-add-person'); showToast(`✓ ${name} agregado`); vibrate();
   renderAjustes();
 }
@@ -786,9 +831,12 @@ function renderHistorial() {
     const d = fmtDate(tx.date);
     return `<div class="tx-item" onclick="openEditTx('${tx.id}')">
       <div class="tx-date-col"><div class="tx-date-day">${d.day}</div><div class="tx-date-mon">${d.mon}</div></div>
-      <div class="tx-info">
+    <div class="tx-info">
         <div class="tx-motive">${tx.motive}</div>
-        <span class="tx-tag-pill">${tx.category}</span>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span class="tx-tag-pill">${tx.category}</span>
+          ${d.time ? `<span style="font-size:10px; color:var(--fg3); margin-top:3px;">⏰ ${d.time}</span>` : ''}
+        </div>
       </div>
       <div class="tx-amount">${tx.amount.toFixed(2)}</div>
       <div class="tx-edit">›</div>
@@ -816,15 +864,73 @@ function saveEditTx() {
   if (isNaN(m) || m < 0) { showToast('Monto inválido'); return; }
   tx.motive = document.getElementById('edit-motivo').value.trim() || 'Sin descripción';
   tx.amount = m; tx.category = editSelectedTag;
-  save(); renderHistorial(); renderWallets();
-  closeSheet('sheet-tx'); showToast('✓ Cambios guardados'); vibrate();
+  save(); 
+  renderHistorial(); 
+  renderWallets();
+  
+  closeSheet('sheet-tx'); 
+  showToast('✓ Cambios guardados'); 
+  vibrate();
+
+  // Si estábamos viendo el monedero de alguien, lo actualizamos visualmente
+  if (viewingPersonId && document.getElementById('sheet-wallet').classList.contains('open')) {
+      openWalletDetail(viewingPersonId);
+  }
 }
 
 function deleteTx() {
   if (!confirm('¿Eliminar este gasto?')) return;
   state.transactions = state.transactions.filter(t => t.id !== editingTxId);
-  save(); renderHistorial(); renderWallets();
-  closeSheet('sheet-tx'); showToast('Gasto eliminado'); vibrate();
+  save(); 
+  renderHistorial(); 
+  renderWallets();
+  
+  closeSheet('sheet-tx'); 
+  showToast('Gasto eliminado'); 
+  vibrate();
+
+  // Si estábamos viendo el monedero de alguien, lo actualizamos visualmente
+  if (viewingPersonId && document.getElementById('sheet-wallet').classList.contains('open')) {
+      openWalletDetail(viewingPersonId);
+  }
+}
+
+function cancelEditTx() {
+    closeSheet('sheet-tx');
+    // Si abrimos la edición desde el monedero, el monedero ya está abierto en el fondo,
+    // simplemente cerramos el sheet de edición y revelamos el monedero que estaba atrás.
+}
+
+// ─── PRESUPUESTO MANUAL ──────────────────────────────────────────────────────
+let editingBudgetPersonId = null;
+
+function openEditBudget(personId) {
+  editingBudgetPersonId = personId;
+  const p = state.persons.find(x => x.id === personId);
+  if (!p) return;
+  
+  // Rellenar con los datos guardados o dejar vacío
+  document.getElementById('edit-budget-soles').value = p.budgetSoles || '';
+  document.getElementById('edit-budget-dollars').value = p.budgetDollars || '';
+  document.getElementById('edit-budget-tc').value = p.budgetTc || '';
+  
+  openSheet('sheet-budget');
+}
+
+function saveBudget() {
+  const p = state.persons.find(x => x.id === editingBudgetPersonId);
+  if (!p) return;
+  
+  // Guardar textualmente lo que el usuario escribió (sin calcular nada)
+  p.budgetSoles = document.getElementById('edit-budget-soles').value;
+  p.budgetDollars = document.getElementById('edit-budget-dollars').value;
+  p.budgetTc = document.getElementById('edit-budget-tc').value;
+  
+  save(); // Guardar en LocalStorage
+  closeSheet('sheet-budget');
+  openWalletDetail(p.id); // Recargar la vista con los nuevos datos
+  showToast('✓ Presupuesto guardado');
+  vibrate();
 }
 
 // ─── WALLETS ─────────────────────────────────────────────────────────────────
@@ -859,11 +965,14 @@ function openWalletDetail(personId) {
   const c = document.getElementById('wallet-detail-content');
   const txHtml = txs.length ? txs.map(tx => {
     const d = fmtDate(tx.date);
-    return `<div class="tx-item" onclick="openEditTx('${tx.id}');closeSheet('sheet-wallet');">
+    return `<div class="tx-item" onclick="openEditTx('${tx.id}');">
       <div class="tx-date-col"><div class="tx-date-day">${d.day}</div><div class="tx-date-mon">${d.mon}</div></div>
-      <div class="tx-info">
+<div class="tx-info">
         <div class="tx-motive">${tx.motive}</div>
-        <span class="tx-tag-pill">${tx.category}</span>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span class="tx-tag-pill">${tx.category}</span>
+          ${d.time ? `<span style="font-size:10px; color:var(--fg3); margin-top:3px;">⏰ ${d.time}</span>` : ''}
+        </div>
       </div>
       <div class="tx-amount">${tx.amount.toFixed(2)}</div>
       <div class="tx-edit">›</div>
@@ -877,9 +986,15 @@ function openWalletDetail(personId) {
         <div style="font-size:13px;color:var(--fg3);">${txs.length} gasto${txs.length!==1?'s':''}</div>
       </div>
     </div>
-    <div class="wallet-detail-header" style="margin:0 -20px;padding:0 20px 16px;">
-      <div class="wallet-total-big">${total.toFixed(2)}</div>
-      <div class="wallet-total-sub">S/. total acumulado</div>
+ <div class="wallet-detail-header" style="margin:0 -20px;padding:0 20px 16px; display:flex; justify-content:space-between; align-items:flex-end;">
+      <div>
+        <div class="wallet-total-big">${total.toFixed(2)}</div>
+        <div class="wallet-total-sub">S/. total acumulado</div>
+      </div>
+      <div style="text-align:right; cursor:pointer; background:var(--bg2); padding:10px 14px; border-radius:12px; margin-left:12px;" onclick="openEditBudget('${p.id}')">
+        <div style="font-size:16px; font-weight:700; color:var(--fg);">S/. ${p.budgetSoles || '0'} <span style="font-size:12px;opacity:0.6;margin-left:4px;">✏️</span></div>
+        <div style="font-size:11px; color:var(--fg3); margin-top:2px;">Presupuesto ${p.budgetDollars ? `$${p.budgetDollars}` : ''} ${p.budgetTc ? `(TC: ${p.budgetTc})` : ''}</div>
+      </div>
     </div>
     <div style="margin:0 -20px;">
       <div class="tx-list" style="padding:0 20px;">${txHtml}</div>
