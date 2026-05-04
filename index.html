@@ -590,18 +590,23 @@ body.sheet-open { overflow: hidden; position: fixed; width: 100%; }
   </div>
 </div>
 
-<!-- SHEET: NUMPAD FONDOS -->
+<!-- SHEET: FONDOS (monto + tipo de cambio manual) -->
 <div class="sheet-overlay" id="sheet-numpad-fondos" onclick="closeSheetIf(event,'sheet-numpad-fondos')">
   <div class="sheet" style="touch-action:none;">
     <div class="sheet-handle"></div>
-    <div style="text-align:center;padding:8px 0 4px;">
-      <div style="font-size:13px;color:var(--fg3);margin-bottom:8px;" id="fondos-numpad-label">Agregar fondos</div>
-      <div style="font-family:var(--font-display);font-size:42px;font-weight:700;letter-spacing:-2px;color:var(--fg);">
+    <div style="font-family:var(--font-display);font-size:20px;font-weight:700;margin-bottom:4px;color:var(--fg);" id="fondos-numpad-label">Agregar fondos</div>
+    <div style="font-size:13px;color:var(--fg3);margin-bottom:16px;">Ingresa el monto en soles y el tipo de cambio del día.</div>
+
+    <!-- Monto en soles -->
+    <div style="text-align:center;padding:4px 0 8px;">
+      <div style="font-size:11px;font-weight:600;color:var(--fg3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">Monto en soles</div>
+      <div style="font-family:var(--font-display);font-size:44px;font-weight:700;letter-spacing:-2px;color:var(--fg);">
         S/. <span id="fondos-numpad-display">0.00</span>
       </div>
-      <div id="fondos-usd-preview" style="margin-top:6px;min-height:20px;font-size:13px;color:#1a7f4b;font-weight:600;"></div>
     </div>
-    <div class="numpad">
+
+    <!-- Numpad -->
+    <div class="numpad" style="margin-bottom:16px;">
       <button class="numpad-key" onclick="fondosNumpadPress('1')">1</button>
       <button class="numpad-key" onclick="fondosNumpadPress('2')">2</button>
       <button class="numpad-key" onclick="fondosNumpadPress('3')">3</button>
@@ -614,8 +619,23 @@ body.sheet-open { overflow: hidden; position: fixed; width: 100%; }
       <button class="numpad-key" onclick="fondosNumpadPress('.')">.</button>
       <button class="numpad-key" onclick="fondosNumpadPress('0')">0</button>
       <button class="numpad-key del" onclick="fondosNumpadPress('del')">⌫</button>
-      <button class="numpad-key ok" style="grid-column:span 3;" onclick="confirmFondos()">Agregar Fondos ✓</button>
     </div>
+
+    <!-- Tipo de cambio manual -->
+    <div class="card-white" style="padding:0 16px;margin-bottom:12px;">
+      <div class="field-row" style="border:none;padding:12px 0;">
+        <span class="field-label" style="width:auto;margin-right:8px;white-space:nowrap;">1 USD =</span>
+        <input class="field-input" id="fondos-tc-input" type="number" step="0.01" min="1" inputmode="decimal"
+          placeholder="3.75" style="font-size:20px;font-weight:700;text-align:right;width:90px;flex:none;"
+          oninput="updateFondosUsdPreview()">
+        <span style="font-size:15px;font-weight:600;color:var(--fg2);margin-left:6px;">S/.</span>
+      </div>
+    </div>
+
+    <!-- Preview USD -->
+    <div id="fondos-usd-preview" style="text-align:center;min-height:22px;font-size:14px;color:#1a7f4b;font-weight:700;margin-bottom:14px;"></div>
+
+    <button class="numpad-key ok" style="width:100%;height:54px;border-radius:var(--radius);font-size:16px;" onclick="confirmFondos()">Agregar Fondos ✓</button>
   </div>
 </div>
 
@@ -877,9 +897,12 @@ function confirmAmount() {
 function openFondosNumpad(personId) {
   fondosPersonId = personId;
   const p = state.persons.find(x => x.id === personId);
-  const currentFondos = state.fondos[personId] || 0;
-  fondosNumpadRaw = currentFondos > 0 ? (currentFondos * 100).toFixed(0) : '';
+  const fondoData = state.fondos[personId];
+  const currentMonto = fondoData ? fondoData.monto : 0;
+  const lastTc = fondoData ? fondoData.tc : (state.tipoCambio || 3.75);
+  fondosNumpadRaw = currentMonto > 0 ? (currentMonto * 100).toFixed(0) : '';
   document.getElementById('fondos-numpad-label').textContent = p ? `Fondos de ${p.name}` : 'Agregar fondos';
+  document.getElementById('fondos-tc-input').value = lastTc.toFixed(2);
   updateFondosNumpadDisplay();
   // Cerrar wallet detail si está abierto
   closeSheet('sheet-wallet');
@@ -900,29 +923,37 @@ function fondosNumpadPress(key) {
 function updateFondosNumpadDisplay() {
   const val = fondosNumpadRaw ? (parseInt(fondosNumpadRaw) / 100).toFixed(2) : '0.00';
   document.getElementById('fondos-numpad-display').textContent = val;
-  // Preview USD
-  const soles = parseFloat(val);
+  updateFondosUsdPreview();
+}
+
+function updateFondosUsdPreview() {
+  const solesVal = fondosNumpadRaw ? (parseInt(fondosNumpadRaw) / 100) : 0;
+  const tcVal = parseFloat(document.getElementById('fondos-tc-input').value);
   const usdPreview = document.getElementById('fondos-usd-preview');
-  if (soles > 0) {
-    const usd = solesToUSD(soles);
-    const tc = state.tipoCambio || 3.75;
-    usdPreview.textContent = `≈ ${formatUSD(usd)} · cambio S/. ${tc.toFixed(2)}`;
+  if (solesVal > 0 && tcVal > 0) {
+    const usd = solesVal / tcVal;
+    usdPreview.textContent = `≈ ${formatUSD(usd)} · cambio S/. ${tcVal.toFixed(2)}`;
   } else {
     usdPreview.textContent = '';
   }
 }
 
 function confirmFondos() {
-  const amount = fondosNumpadRaw ? parseInt(fondosNumpadRaw) / 100 : 0;
+  const monto = fondosNumpadRaw ? parseInt(fondosNumpadRaw) / 100 : 0;
+  const tc = parseFloat(document.getElementById('fondos-tc-input').value);
   if (!fondosPersonId) return;
-  state.fondos[fondosPersonId] = amount;
+  if (monto <= 0) { showToast('Ingresa un monto'); return; }
+  if (isNaN(tc) || tc <= 0) { showToast('Ingresa el tipo de cambio'); return; }
+  // Guardar monto Y tipo de cambio usado
+  state.fondos[fondosPersonId] = { monto, tc };
+  // Actualizar tipoCambio global con el último usado
+  state.tipoCambio = tc;
   save();
   closeSheet('sheet-numpad-fondos');
   renderWallets();
   vibrate();
   const p = state.persons.find(x => x.id === fondosPersonId);
   showToast(`✓ Fondos de ${p ? p.name : ''} actualizados`);
-  // Reabrir wallet detail
   setTimeout(() => openWalletDetail(fondosPersonId), 300);
 }
 
@@ -1076,13 +1107,14 @@ function renderWallets() {
     c.innerHTML = `<div class="empty-state"><div class="empty-icon">👛</div><div class="empty-title">Sin personas aún</div><div class="empty-sub">Toca el + para agregar<br>a alguien a tus monederos.</div></div>`;
     return;
   }
-  const tc = state.tipoCambio || 3.75;
   c.innerHTML = state.persons.map(p => {
     const txs = state.transactions.filter(t => t.personId === p.id);
     const totalGastos = txs.reduce((s,t) => s+t.amount, 0);
-    const fondos = state.fondos[p.id] || 0;
+    const fondoData = state.fondos[p.id];
+    const fondos = fondoData ? fondoData.monto : 0;
+    const tc = fondoData ? fondoData.tc : (state.tipoCambio || 3.75);
     const saldo = fondos - totalGastos;
-    const usdFondos = solesToUSD(fondos);
+    const usdFondos = fondos / tc;
 
     // Color del saldo
     let saldoColor = 'var(--fg)';
@@ -1123,14 +1155,15 @@ function openWalletDetail(personId) {
   const p = state.persons.find(x => x.id === personId);
   const txs = state.transactions.filter(t => t.personId === personId);
   const totalGastos = txs.reduce((s,t) => s+t.amount, 0);
-  const fondos = state.fondos[personId] || 0;
+  const fondoData = state.fondos[personId];
+  const fondos = fondoData ? fondoData.monto : 0;
+  const tc = fondoData ? fondoData.tc : (state.tipoCambio || 3.75);
   const saldo = fondos - totalGastos;
-  const tc = state.tipoCambio || 3.75;
 
   // USD conversions
-  const usdFondos = solesToUSD(fondos);
-  const usdGastos = solesToUSD(totalGastos);
-  const usdSaldo = solesToUSD(Math.abs(saldo));
+  const usdFondos = fondos / tc;
+  const usdGastos = totalGastos / tc;
+  const usdSaldo = Math.abs(saldo) / tc;
 
   const usdBubbleFondos = fondos > 0
     ? `<div class="usd-bubble" style="display:inline-flex;">
